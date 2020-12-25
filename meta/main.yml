@@ -1,5 +1,5 @@
 galaxy_info:
-  name: kvm
+  role_name: kvm
   author: lukasic
   description: Ansible KVM Hypervisor Role
   
