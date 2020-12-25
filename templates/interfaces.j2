@@ -1,0 +1,38 @@
+#
+# Managed with Ansible
+#
+
+auto lo
+iface lo inet loopback
+
+auto {{ primary_iface }}
+iface {{ primary_iface }} inet manual
+
+auto {{ primary_bridge_name }}
+iface {{ primary_bridge_name }} inet static
+    address {{ primary_ipv4 }}
+    gateway {{ primary_gw }}
+    bridge_ports {{ primary_iface }}
+    bridge_stp off
+    bridge_fd 0
+    mtu 1500
+
+# 
+# Access VLANs
+# 
+
+{% for vlan in kvm_vlans %}
+auto vlan{{ vlan }}
+iface vlan{{ vlan }} inet manual
+    vlan-raw-device {{ primary_iface }}
+    mtu 1500
+
+auto br{{ vlan }}
+iface br{{ vlan }} inet manual
+    bridge-ports vlan{{ vlan }}
+    bridge-stp off
+    bridge-fd 0
+    mtu 1500
+    up sysctl -w net.ipv6.conf.br{{ vlan }}.disable_ipv6=1
+
+{% endfor %}

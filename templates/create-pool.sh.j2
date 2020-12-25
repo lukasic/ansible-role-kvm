@@ -1,0 +1,18 @@
+#!/bin/bash
+
+#
+# Managed with Ansible
+#
+
+NAME=$1
+
+if [ "$1" == "" ]; then
+  echo "Usage: $0 name";
+  exit 1;
+fi
+
+mkdir -p /data/fast/$NAME
+
+virsh pool-define-as $NAME dir - - - - /data/fast/$NAME
+virsh pool-autostart $NAME
+virsh pool-start $NAME

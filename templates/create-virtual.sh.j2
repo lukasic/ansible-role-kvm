@@ -1,0 +1,109 @@
+#!/bin/bash
+
+#
+# Managed with Ansible
+#
+
+cd `mktemp -d`
+
+NAME=$1
+DOMAIN=$2
+BRIDGE=$3
+IP=$4
+GW=$5
+CPU=$6
+RAM=$7
+SIZE=$8
+OS=$9
+
+if [ "$#" -ne 9 ]; then
+    echo "Usage: $0 name domain bridge ip gw cpu_count ram_size disk_size os"
+    exit 1
+fi
+
+test -d /data/{{ lvm_data_name }}/$NAME && {
+    echo "directory /data/{{ lvm_data_name }}/$NAME exists, exit"
+    exit 1
+}
+
+test -f /data/{{ lvm_data_name }}/$NAME/$NAME.qcow2 && {
+  echo "disk /data/{{ lvm_data_name }}/$NAME.qcow2 exists, exit"
+  exit 1
+}
+
+virsh list --all | grep $NAME &> /dev/null
+if [ $? -eq 0 ]; then
+  echo "virtual already exists, exit"
+  exit 1
+fi
+
+
+case "$OS" in
+  debian10)
+    URL=https://cdimage.debian.org/cdimage/openstack/current-10/debian-10-openstack-amd64.qcow2
+    ;;
+
+  debian9)
+    URL=https://cdimage.debian.org/cdimage/openstack/current-9/debian-9-openstack-amd64.qcow2
+    ;;
+
+  *)
+    echo "unknown OS, possible options: debian9 debian10"
+    exit 1
+
+esac
+
+
+mkdir /data/{{ lvm_data_name }}/$NAME
+cd /data/{{ lvm_data_name }}/$NAME
+
+cat - > meta-data <<EOF
+instance-id: $NAME.$DOMAIN
+local-hostname: $NAME.$DOMAIN
+hostname: $NAME.$DOMAIN
+
+network-interfaces: |
+  iface eth0 inet static
+  address $IP
+  netmask 255.255.255.0
+  gateway $GW
+
+EOF
+
+newpasswd=$(pwgen -s -c 20 1)
+
+cat - > user-data <<EOF
+#cloud-config
+
+ssh_authorized_keys:
+{% for user in users %}
+{% for key in user.authorized_keys %}
+  - {{ key }}
+{% endfor %}
+{% endfor %}
+
+password: $newpasswd
+{% raw %}
+chpasswd: { expire: False }
+{% endraw %}
+ssh_pwauth: False
+EOF
+
+genisoimage -input-charset iso-8859-1 -output nocloud.iso -volid cidata -joliet -rock meta-data user-data
+
+wget $URL -O $NAME.qcow2
+qemu-img resize $NAME.qcow2 $SIZE
+
+virt-install --import \
+  --name $NAME \
+  --vcpu $CPU \
+  --ram $RAM \
+  --disk path=/data/{{ lvm_data_name }}/$NAME/$NAME.qcow2,format=qcow2 \
+  --disk /data/{{ lvm_data_name }}/$NAME/nocloud.iso,device=cdrom,bus=ide \
+  --network=bridge=$BRIDGE \
+  --os-variant=$OS \
+  --graphics=vnc \
+  --console pty,target_type=serial \
+  --machine pc-i440fx-2.8 \
+  --noautoconsole
+

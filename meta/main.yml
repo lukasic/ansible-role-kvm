@@ -1,0 +1,18 @@
+galaxy_info:
+  name: kvm
+  author: lukasic
+  description: Ansible KVM Hypervisor Role
+  
+  license: WTFPL
+
+  min_ansible_version: 2.8
+
+  platforms:
+  - name: Debian
+    versions:
+    - buster
+ 
+  galaxy_tags:
+  - kvm
+
+dependencies: []

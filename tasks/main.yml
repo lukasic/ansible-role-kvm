@@ -1,0 +1,105 @@
+---
+- name: deploy /etc/network/interfaces
+  template:
+    src: interfaces.j2
+    dest: /etc/network/interfaces
+  when: kvm_manage_interfaces == true
+
+- name: Install libvirt
+  apt:
+    pkg:
+      - libvirt-daemon
+      - libvirt-daemon-system
+      - libvirt-clients
+      - qemu-kvm
+    state: latest
+    update_cache: true
+
+- name: Install useful tools
+  apt:
+    pkg:
+      - virt-top
+      - virtinst
+      - libguestfs-tools
+      - pwgen
+    state: latest
+
+- name: Install network utils
+  apt:
+    pkg:
+      - bridge-utils
+      - vlan
+      - ifenslave
+      - tcpdump
+      - iftop
+      - bmon
+      - net-tools
+    state: latest
+
+- name: Install python3-lxml
+  apt:
+    pkg: python3-lxml
+    state: latest
+
+#
+# LVM
+#
+- name: Remove volume deleteme created during installation.
+  lvol:
+    vg: "{{ lvm_vg_name }}"
+    lv: deleteme
+    state: absent
+    force: yes
+
+- name: Create LVM for virtual servers on SSD VG
+  lvol:
+    vg: "{{ lvm_vg_name }}"
+    lv: "{{ lvm_data_name }}"
+    size: 80%VG
+    shrink: no
+
+- name: Create a ext4 filesystem on "/dev/{{ lvm_vg_name }}/{{ lvm_data_name }}"
+  filesystem:
+    fstype: ext4
+    dev: "/dev/{{ lvm_vg_name }}/{{ lvm_data_name }}"
+    force: no
+    resizefs: yes
+
+- name: Create a directory "/data/{{ lvm_data_name }}"
+  file:
+    path: "/data/{{ lvm_data_name }}"
+    state: directory
+    mode: '0755'
+
+- name: Mount up device ""{{ lvm_vg_name }}"-{{ lvm_data_name }}"
+  mount:
+    path: "/data/{{ lvm_data_name }}"
+    src: "/dev/{{ lvm_vg_name }}/{{ lvm_data_name }}"
+    fstype: ext4
+    state: mounted
+
+- name: Copy scripts
+  template:
+    src: "{{ item }}.j2"
+    dest: "/root/{{ item }}"
+    mode: '0755'
+  loop:
+    - create-virtual.sh
+    - create-pool.sh
+    - migrate-virtual.sh
+    - prepare-migration.sh
+    - delete-virtual.sh
+
+- name: create storage pool "/data/{{ lvm_data_name }}"
+  community.libvirt.virt_pool:
+    command: define
+    name: "{{ lvm_data_name }}"
+    state: present
+    autostart: yes
+    xml: '{{ lookup("template", "pool.xml.j2") }}'
+
+- name: autostart a storage pool
+  community.libvirt.virt_pool:
+    autostart: yes
+    name: "{{ lvm_data_name }}"
+

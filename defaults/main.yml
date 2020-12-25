@@ -1,0 +1,13 @@
+---
+lvm_data_name: "fast"
+lvm_vg_name: "vg0"
+
+kvm_manage_interfaces: false
+
+primary_ipv4: null
+primary_gw: null
+primary_iface: "ens3"
+primary_bridge_name: "br0"
+
+users: []
+

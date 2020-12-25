@@ -1,0 +1,25 @@
+#!/bin/bash
+
+#
+# Managed with Ansible
+#
+
+DEST=$2
+DOMAIN=$1
+
+echo check if domain exists on target
+ssh $DEST "/root/prepare-migration.sh $DOMAIN" || exit 1
+
+for file in nocloud.iso meta-data user-data; do
+  test -f /data/fast/$DOMAIN/nocloud.iso && {
+    echo copy /data/fast/$DOMAIN/$file
+    scp /data/fast/$DOMAIN/$file root@$DEST:/data/fast/$DOMAIN/$file
+  }
+done
+
+echo setting maximum migration speed 80 MB/s
+virsh migrate-setspeed $DOMAIN 80
+
+echo starting migration...
+virsh migrate --live --verbose --persistent --copy-storage-all $DOMAIN qemu+ssh://$DEST/system
+

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+#
+# Managed with Ansible
+#
+
+DOMAIN=$1
+
+test -d /data/fast/$DOMAIN && {
+  echo error - path /data/fast/$DOMAIN exists
+  exit 1
+}
+
+/root/create-pool.sh $DOMAIN
+
